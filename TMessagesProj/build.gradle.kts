@@ -220,7 +220,7 @@ android {
             isJniDebuggable = true
             // [本机临时改动 - 构建后还原] 与官方 CI 包并排安装: 换包名避免签名冲突, 换显示名便于区分
             applicationIdSuffix = ".dev"
-            resValue("string", "NullgramName", "Nnngram dev")
+            resValue("string", "NullgramName", "NnngramH")
         }
     }
 
