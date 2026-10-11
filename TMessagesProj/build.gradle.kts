@@ -218,6 +218,9 @@ android {
             isDefault = true
             isDebuggable = true
             isJniDebuggable = true
+            // [本机临时改动 - 构建后还原] 与官方 CI 包并排安装: 换包名避免签名冲突, 换显示名便于区分
+            applicationIdSuffix = ".dev"
+            resValue("string", "NullgramName", "Nnngram dev")
         }
     }
 
@@ -231,9 +234,10 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_static",
                     "-DANDROID_PLATFORM=android-27",
-                    "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
-                    "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
-                    "-DNDK_CCACHE=ccache",
+                    // [本机临时改动 - 构建后 git checkout 还原] 本机未装 ccache, 首次构建用不上缓存
+                    // "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
+                    // "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
+                    // "-DNDK_CCACHE=ccache",
                     "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
                 )
             }
