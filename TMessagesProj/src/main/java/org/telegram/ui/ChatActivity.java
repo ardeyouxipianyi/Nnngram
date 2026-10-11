@@ -371,6 +371,7 @@ import me.vkryl.core.reference.ReferenceList;
 
 import kotlin.Unit;
 import xyz.nextalone.gen.Config;
+import xyz.nextalone.nnngram.activity.FilterRulesActivity;
 import xyz.nextalone.nnngram.activity.MessageDetailActivity;
 import xyz.nextalone.nnngram.config.ConfigManager;
 import xyz.nextalone.nnngram.config.DialogConfig;
@@ -1293,6 +1294,8 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_NOQUOTE_FORWARD = 95;
     public final static int OPTION_REPEAT_AS_COPY = 96;
     public final static int OPTION_REVERSE = 97;
+    /** Nnngram: 消息菜单「过滤此类消息」. */
+    public final static int OPTION_FILTER_MESSAGE = 117;
     public final static int OPTION_ABOUT_REVENUE_SHARING_ADS = 33;
     public final static int OPTION_REPORT_AD = 34;
     public final static int OPTION_REMOVE_ADS = 35;
@@ -34437,6 +34440,79 @@ public class ChatActivity extends BaseFragment implements
     }
 
 
+    /**
+     * Nnngram: 从消息里推导一条过滤规则的候选文本.
+     * 用说明文字 (没有则用正文) 的第一行, 因为规则是"包含"匹配, 整段说明文字太长不实用.
+     * 长度截到 50 字符, 避免规则值过长.
+     */
+    private static String filterTextForRule(MessageObject messageObject) {
+        if (messageObject == null || messageObject.messageOwner == null) {
+            return null;
+        }
+        CharSequence source = messageObject.caption != null ? messageObject.caption : messageObject.messageOwner.message;
+        if (TextUtils.isEmpty(source)) {
+            return null;
+        }
+        String text = source.toString().trim();
+        int lineEnd = text.indexOf('\n');
+        if (lineEnd > 0) {
+            text = text.substring(0, lineEnd).trim();
+        }
+        if (text.isEmpty()) {
+            return null;
+        }
+        return text.length() > 50 ? text.substring(0, 50) : text;
+    }
+
+    /** Nnngram: 追加一条过滤规则并立即生效 (save() 内部会 invalidate 并广播, 当前聊天自动刷新). */
+    private void appendFilterRule(int matchType, String matchValue) {
+        ArrayList<MessageFilterRules.Rule> rules = new ArrayList<>(MessageFilterRules.loadRaw());
+        rules.add(new MessageFilterRules.Rule(
+            java.util.UUID.randomUUID().toString(), matchType, matchValue,
+            MessageFilterRules.ACTION_HIDE, true, false));
+        MessageFilterRules.save(rules);
+    }
+
+    /** Nnngram: 「过滤此类消息」对话框 — 按发送者 / 按文本 / 打开规则管理器. */
+    private void showFilterMessageDialog(MessageObject messageObject) {
+        if (getParentActivity() == null || messageObject == null) {
+            return;
+        }
+        final long senderId = messageObject.getSenderId();
+        final String text = filterTextForRule(messageObject);
+
+        final ArrayList<CharSequence> labels = new ArrayList<>();
+        final ArrayList<Integer> kinds = new ArrayList<>();
+        if (senderId != 0) {
+            labels.add(LocaleController.getString("FilterBySender", R.string.FilterBySender));
+            kinds.add(0);
+        }
+        if (!TextUtils.isEmpty(text)) {
+            labels.add(LocaleController.getString("FilterByText", R.string.FilterByText));
+            kinds.add(1);
+        }
+        labels.add(LocaleController.getString("FilterOpenRules", R.string.FilterOpenRules));
+        kinds.add(2);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(LocaleController.getString("FilterThisMessage", R.string.FilterThisMessage));
+        builder.setItems(labels.toArray(new CharSequence[0]), (dialog, which) -> {
+            int kind = kinds.get(which);
+            if (kind == 0) {
+                appendFilterRule(MessageFilterRules.MATCH_SENDER_ID, Long.toString(senderId));
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.info,
+                    LocaleController.getString("FilterRuleAdded", R.string.FilterRuleAdded)).show();
+            } else if (kind == 1) {
+                appendFilterRule(MessageFilterRules.MATCH_CONTAINS, text);
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.info,
+                    LocaleController.getString("FilterRuleAdded", R.string.FilterRuleAdded)).show();
+            } else {
+                presentFragment(new FilterRulesActivity());
+            }
+        });
+        showDialog(builder.create());
+    }
+
     private void processSelectedOption(int option) {
         if (selectedObject == null || getParentActivity() == null) {
             return;
@@ -35359,6 +35435,10 @@ public class ChatActivity extends BaseFragment implements
             }
             case OPTION_DETAIL: {
                 presentFragment(new MessageDetailActivity(selectedObject));
+                break;
+            }
+            case OPTION_FILTER_MESSAGE: {
+                showFilterMessageDialog(selectedObject);
                 break;
             }
             case OPTION_VIEW_HISTORY: {
@@ -47935,6 +48015,13 @@ public class ChatActivity extends BaseFragment implements
                     items.add(LocaleController.getString("MessageDetails", R.string.MessageDetails));
                     options.add(OPTION_DETAIL);
                     icons.add(R.drawable.msg_info);
+                }
+                // === Nnngram: 过滤此类消息 (按发送者或说明文字/正文建规则) ===
+                if (selectedObject != null && !selectedObject.isSponsored() && !isEphemeral
+                    && (selectedObject.getSenderId() != 0 || filterTextForRule(selectedObject) != null)) {
+                    items.add(LocaleController.getString("FilterThisMessage", R.string.FilterThisMessage));
+                    options.add(OPTION_FILTER_MESSAGE);
+                    icons.add(R.drawable.msg_block2);
                 }
                 boolean canViewStats = false;
                 if (message.messageOwner.views > 0 || message.messageOwner.forwards > 0) {

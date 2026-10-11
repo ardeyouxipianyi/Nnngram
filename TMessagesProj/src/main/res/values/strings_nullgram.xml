@@ -521,4 +521,9 @@
     <string name="CustomQuickMessage">Custom quick message</string>
     <string name="ResetSettings">Reset Settings</string>
     <string name="ResetSettingsAlert">Reset everything under Nnngram Settings to defaults? This also clears the custom API, translation API tokens, message filters, channel aliases, custom quick messages and other data saved there. The passcode and the settings and themes of Telegram itself are not affected. The app will restart.</string>
+    <string name="FilterThisMessage">Filter messages like this</string>
+    <string name="FilterBySender">Hide by sender</string>
+    <string name="FilterByText">Hide by this text</string>
+    <string name="FilterOpenRules">Open filter rules</string>
+    <string name="FilterRuleAdded">Filter rule added and applied</string>
 </resources>
