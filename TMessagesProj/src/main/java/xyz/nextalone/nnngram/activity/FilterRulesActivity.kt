@@ -26,12 +26,8 @@ import android.text.TextUtils
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
-import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.RadioButton
-import android.widget.RadioGroup
-import android.widget.TextView
 import org.json.JSONArray
 import androidx.recyclerview.widget.RecyclerView
 import org.telegram.messenger.AndroidUtilities
@@ -46,9 +42,8 @@ import org.telegram.ui.Cells.TextInfoPrivacyCell
 import org.telegram.ui.Cells.TextSettingsCell
 import org.telegram.ui.Components.EditTextBoldCursor
 import org.telegram.ui.Components.LayoutHelper
+import xyz.nextalone.nnngram.helpers.FilterRuleDialog
 import xyz.nextalone.nnngram.helpers.MessageFilterRules
-import java.util.UUID
-import java.util.regex.Pattern
 
 @SuppressLint("NotifyDataSetChanged")
 class FilterRulesActivity : BaseActivity() {
@@ -221,130 +216,14 @@ class FilterRulesActivity : BaseActivity() {
         return false
     }
 
-    /** 显示新增/编辑规则对话框. editIndex=null 表示新增. */
+    /** 显示新增/编辑规则对话框. editIndex=null 表示新增. 表单本体在 FilterRuleDialog, 与聊天页「过滤此类消息」共用. */
     private fun showEditDialog(editIndex: Int?) {
-        val context = parentActivity ?: return
-        val editing = editIndex?.let { rules[it] }
-
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(AndroidUtilities.dp(24f), 0, AndroidUtilities.dp(24f), 0)
+        val editing = editIndex?.let { rules.getOrNull(it) }
+        FilterRuleDialog.show(this, editing, null) {
+            // 从 prefs 重新读回, 保证本地列表与刚落盘的结果一致
+            rules = MessageFilterRules.loadRaw().toMutableList()
+            updateRows()
         }
-
-        fun addLabel(text: String) {
-            container.addView(TextView(context).apply {
-                setText(text)
-                setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13f)
-                setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider))
-                setPadding(0, AndroidUtilities.dp(12f), 0, AndroidUtilities.dp(4f))
-            })
-        }
-
-        addLabel(LocaleController.getString("FilterRulesMatchType", R.string.FilterRulesMatchType))
-        val matchGroup = RadioGroup(context)
-        val matchLabels = mapOf(
-            MessageFilterRules.MATCH_CONTAINS to LocaleController.getString("FilterRulesMatchContains", R.string.FilterRulesMatchContains),
-            MessageFilterRules.MATCH_REGEX to LocaleController.getString("FilterRulesMatchRegex", R.string.FilterRulesMatchRegex),
-            MessageFilterRules.MATCH_SENDER_ID to LocaleController.getString("FilterRulesMatchSenderId", R.string.FilterRulesMatchSenderId),
-            MessageFilterRules.MATCH_VIA_BOT to LocaleController.getString("FilterRulesMatchViaBot", R.string.FilterRulesMatchViaBot),
-        )
-        matchLabels.forEach { (type, label) ->
-            matchGroup.addView(RadioButton(context).apply {
-                id = type + 1000
-                text = label
-                isChecked = (editing?.matchType ?: MessageFilterRules.MATCH_CONTAINS) == type
-            })
-        }
-        container.addView(matchGroup)
-
-        addLabel(LocaleController.getString("FilterRulesMatchValue", R.string.FilterRulesMatchValue))
-        val valueEdit = EditTextBoldCursor(context).apply {
-            background = null
-            setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16f)
-            setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider))
-            setCursorColor(Theme.getColor(Theme.key_dialogTextBlack))
-            setCursorSize(AndroidUtilities.dp(20f))
-            setCursorWidth(1.5f)
-            setLineColors(
-                Theme.getColor(Theme.key_windowBackgroundWhiteInputField),
-                Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated),
-                Theme.getColor(Theme.key_text_RedRegular),
-            )
-            setText(editing?.matchValue ?: "")
-            setHintText(LocaleController.getString("FilterRulesMatchValueHint", R.string.FilterRulesMatchValueHint))
-        }
-        container.addView(valueEdit, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 40))
-
-        val caseInsensitiveBox = CheckBox(context).apply {
-            text = LocaleController.getString("FilterRulesCaseInsensitive", R.string.FilterRulesCaseInsensitive)
-            isChecked = editing?.caseInsensitive ?: false
-        }
-        container.addView(caseInsensitiveBox)
-
-        addLabel(LocaleController.getString("FilterRulesAction", R.string.FilterRulesAction))
-        val actionGroup = RadioGroup(context)
-        val actionLabels = mapOf(
-            MessageFilterRules.ACTION_HIDE to LocaleController.getString("FilterRulesActionHide", R.string.FilterRulesActionHide),
-            MessageFilterRules.ACTION_COLLAPSE to LocaleController.getString("FilterRulesActionCollapse", R.string.FilterRulesActionCollapse),
-            MessageFilterRules.ACTION_SPOILER to LocaleController.getString("FilterRulesActionSpoiler", R.string.FilterRulesActionSpoiler),
-        )
-        actionLabels.forEach { (act, label) ->
-            actionGroup.addView(RadioButton(context).apply {
-                id = act + 2000
-                text = label
-                isChecked = (editing?.action ?: MessageFilterRules.ACTION_HIDE) == act
-            })
-        }
-        container.addView(actionGroup)
-
-        AlertDialog.Builder(context, resourcesProvider).apply {
-            setTitle(if (editing == null)
-                LocaleController.getString("FilterRulesAdd", R.string.FilterRulesAdd)
-            else LocaleController.getString("FilterRulesEdit", R.string.FilterRulesEdit))
-            setView(container)
-            setPositiveButton(LocaleController.getString("Save", R.string.Save)) { _, _ ->
-                val value = valueEdit.text?.toString()?.trim().orEmpty()
-                if (value.isEmpty()) return@setPositiveButton
-                val matchType = matchGroup.checkedRadioButtonId.takeIf { it != -1 }?.let { it - 1000 }
-                    ?: MessageFilterRules.MATCH_CONTAINS
-                val action = actionGroup.checkedRadioButtonId.takeIf { it != -1 }?.let { it - 2000 }
-                    ?: MessageFilterRules.ACTION_HIDE
-                if (matchType == MessageFilterRules.MATCH_REGEX) {
-                    runCatching { Pattern.compile(value) }.onFailure {
-                        org.telegram.ui.Components.BulletinFactory.of(this@FilterRulesActivity)
-                            .createErrorBulletin(LocaleController.getString("InvalidPattern", R.string.InvalidPattern))
-                            .show()
-                        return@setPositiveButton
-                    }
-                }
-                if (matchType == MessageFilterRules.MATCH_SENDER_ID && value.toLongOrNull() == null) {
-                    org.telegram.ui.Components.BulletinFactory.of(this@FilterRulesActivity)
-                        .createErrorBulletin(LocaleController.getString("FilterRulesSenderIdInvalid", R.string.FilterRulesSenderIdInvalid))
-                        .show()
-                    return@setPositiveButton
-                }
-                // via bot: "*" / 空 (任意) / 数字 bot id
-                if (matchType == MessageFilterRules.MATCH_VIA_BOT
-                    && value != "*" && value.toLongOrNull() == null) {
-                    org.telegram.ui.Components.BulletinFactory.of(this@FilterRulesActivity)
-                        .createErrorBulletin(LocaleController.getString("FilterRulesViaBotInvalid", R.string.FilterRulesViaBotInvalid))
-                        .show()
-                    return@setPositiveButton
-                }
-                val newRule = MessageFilterRules.Rule(
-                    id = editing?.id ?: UUID.randomUUID().toString(),
-                    matchType = matchType,
-                    matchValue = value,
-                    action = action,
-                    enabled = editing?.enabled ?: true,
-                    caseInsensitive = caseInsensitiveBox.isChecked,
-                )
-                if (editing == null) rules.add(newRule) else rules[editIndex!!] = newRule
-                MessageFilterRules.save(rules)
-                updateRows()
-            }
-            setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null)
-        }.show()
     }
 
     private fun describeRule(r: MessageFilterRules.Rule): String {

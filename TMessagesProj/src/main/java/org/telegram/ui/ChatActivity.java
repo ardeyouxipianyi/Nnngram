@@ -376,6 +376,7 @@ import xyz.nextalone.nnngram.activity.MessageDetailActivity;
 import xyz.nextalone.nnngram.config.ConfigManager;
 import xyz.nextalone.nnngram.config.DialogConfig;
 import xyz.nextalone.nnngram.config.ForwardContext;
+import xyz.nextalone.nnngram.helpers.FilterRuleDialog;
 import xyz.nextalone.nnngram.helpers.MessageFilterRules;
 import xyz.nextalone.nnngram.helpers.MessageHelper;
 import xyz.nextalone.nnngram.helpers.MessageMenuCompact;
@@ -34464,13 +34465,18 @@ public class ChatActivity extends BaseFragment implements
         return text.length() > 50 ? text.substring(0, 50) : text;
     }
 
-    /** Nnngram: 追加一条过滤规则并立即生效 (save() 内部会 invalidate 并广播, 当前聊天自动刷新). */
-    private void appendFilterRule(int matchType, String matchValue) {
-        ArrayList<MessageFilterRules.Rule> rules = new ArrayList<>(MessageFilterRules.loadRaw());
-        rules.add(new MessageFilterRules.Rule(
+    /**
+     * Nnngram: 打开规则编辑器, 预填从消息推导出的匹配条件.
+     * 不直接落盘 —— 让用户能改匹配值 (例如把验证码数字删掉)、忽略大小写、动作 (隐藏/折叠/遮罩) 后再保存.
+     */
+    private void openFilterRuleEditor(int matchType, String matchValue) {
+        MessageFilterRules.Rule template = new MessageFilterRules.Rule(
             java.util.UUID.randomUUID().toString(), matchType, matchValue,
-            MessageFilterRules.ACTION_HIDE, true, false));
-        MessageFilterRules.save(rules);
+            MessageFilterRules.ACTION_HIDE, true,
+            matchType == MessageFilterRules.MATCH_CONTAINS);
+        FilterRuleDialog.show(this, null, template, rule -> BulletinFactory.of(this)
+            .createSimpleBulletin(R.raw.info, LocaleController.getString("FilterRuleAdded", R.string.FilterRuleAdded))
+            .show());
     }
 
     /** Nnngram: 「过滤此类消息」对话框 — 按发送者 / 按文本 / 打开规则管理器. */
@@ -34499,13 +34505,9 @@ public class ChatActivity extends BaseFragment implements
         builder.setItems(labels.toArray(new CharSequence[0]), (dialog, which) -> {
             int kind = kinds.get(which);
             if (kind == 0) {
-                appendFilterRule(MessageFilterRules.MATCH_SENDER_ID, Long.toString(senderId));
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.info,
-                    LocaleController.getString("FilterRuleAdded", R.string.FilterRuleAdded)).show();
+                openFilterRuleEditor(MessageFilterRules.MATCH_SENDER_ID, Long.toString(senderId));
             } else if (kind == 1) {
-                appendFilterRule(MessageFilterRules.MATCH_CONTAINS, text);
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.info,
-                    LocaleController.getString("FilterRuleAdded", R.string.FilterRuleAdded)).show();
+                openFilterRuleEditor(MessageFilterRules.MATCH_CONTAINS, text);
             } else {
                 presentFragment(new FilterRulesActivity());
             }
