@@ -533,4 +533,6 @@
     <string name="FilterByText">依這段文字隱藏</string>
     <string name="FilterOpenRules">開啟規則管理器</string>
     <string name="FilterRuleAdded">已新增過濾規則並生效</string>
+    <string name="HidePinnedBar">隱藏置頂訊息列</string>
+    <string name="ShowPinnedBar">顯示置頂訊息列</string>
 </resources>

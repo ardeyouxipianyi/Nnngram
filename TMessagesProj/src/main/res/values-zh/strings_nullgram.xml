@@ -520,4 +520,6 @@
     <string name="FilterByText">按这段文字隐藏</string>
     <string name="FilterOpenRules">打开规则管理器</string>
     <string name="FilterRuleAdded">已添加过滤规则并生效</string>
+    <string name="HidePinnedBar">隐藏置顶消息栏</string>
+    <string name="ShowPinnedBar">显示置顶消息栏</string>
 </resources>

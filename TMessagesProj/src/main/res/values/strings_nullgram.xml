@@ -526,4 +526,6 @@
     <string name="FilterByText">Hide by this text</string>
     <string name="FilterOpenRules">Open filter rules</string>
     <string name="FilterRuleAdded">Filter rule added and applied</string>
+    <string name="HidePinnedBar">Hide pinned message bar</string>
+    <string name="ShowPinnedBar">Show pinned message bar</string>
 </resources>

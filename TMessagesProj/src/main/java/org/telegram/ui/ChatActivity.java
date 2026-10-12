@@ -544,6 +544,8 @@ public class ChatActivity extends BaseFragment implements
     private long quickSendPauseTimeSec;
     private final java.util.HashSet<Long> quickSendDismissedIds = new java.util.HashSet<>();
     private ActionBarMenuItem.Item hideTitleItem;
+    /** Nnngram: ⋮ 菜单「隐藏置顶消息栏」条目. */
+    private ActionBarMenuItem.Item hidePinnedBarItem;
     /* private float pagedownButtonEnterProgress;
     private float searchUpDownEnterProgress;
     private float mentionsButtonEnterProgress;
@@ -1724,6 +1726,9 @@ public class ChatActivity extends BaseFragment implements
     private final static int hide_title = 102;
 
     private final static int delete_history = 101;
+
+    /** Nnngram: ⋮ 菜单里隐藏/显示顶栏置顶消息 (只对当前聊天生效). */
+    private final static int hide_pinned_bar = 118;
 
 
     private final static int attach_photo = 0;
@@ -4471,6 +4476,15 @@ public class ChatActivity extends BaseFragment implements
                             hideTitleItem.setText(LocaleController.getString("HideTitle", R.string.HideTitle));
                         }
                     }
+                } else if (id == hide_pinned_bar) {
+                    boolean pinnedBarHidden = !isPinnedBarHidden();
+                    setPinnedBarHidden(pinnedBarHidden);
+                    updatePinnedMessageView(true);
+                    if (hidePinnedBarItem != null) {
+                        hidePinnedBarItem.setText(LocaleController.getString(pinnedBarHidden ? "ShowPinnedBar" : "HidePinnedBar",
+                            pinnedBarHidden ? R.string.ShowPinnedBar : R.string.HidePinnedBar));
+                        hidePinnedBarItem.setIcon(pinnedBarHidden ? R.drawable.msg_pin : R.drawable.msg_unpin);
+                    }
                 } else if (id == 888) {
                     dumpCanvas();
                 } else if (id == 889) {
@@ -4844,6 +4858,14 @@ public class ChatActivity extends BaseFragment implements
                     hideTitleString = LocaleController.getString("HideTitle", R.string.HideTitle);
                 }
                 hideTitleItem = headerItem.lazilyAddSubItem(hide_title, R.drawable.hide_title, hideTitleString);
+            }
+            // === Nnngram: 隐藏/显示顶栏置顶消息 (只对当前聊天生效) ===
+            if (currentChat != null) {
+                boolean pinnedBarHidden = isPinnedBarHidden();
+                hidePinnedBarItem = headerItem.lazilyAddSubItem(hide_pinned_bar,
+                    pinnedBarHidden ? R.drawable.msg_pin : R.drawable.msg_unpin,
+                    LocaleController.getString(pinnedBarHidden ? "ShowPinnedBar" : "HidePinnedBar",
+                        pinnedBarHidden ? R.string.ShowPinnedBar : R.string.HidePinnedBar));
             }
             if (currentChat != null && (ChatObject.isMegagroup(currentChat) || !ChatObject.isChannel(currentChat))) {
                 headerItem.lazilyAddSubItem(delete_history, R.drawable.msg_delete, LocaleController.getString("DeleteAllFromSelf", R.string.DeleteAllFromSelf));
@@ -29163,7 +29185,7 @@ public class ChatActivity extends BaseFragment implements
         String callLink = callLink(pinnedMessageObject);
         pinnedMessageButtonShown = botButton != null || !TextUtils.isEmpty(callLink);
         SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
-        if ((threadMessageObject == null || isTopic) && (chatInfo == null && userInfo == null || pinned_msg_id == 0 || !pinnedMessageIds.isEmpty() && pinnedMessageIds.get(0) == preferences.getInt("pin_" + dialog_id, 0)) || isReport() || actionBar != null && (actionBar.isActionModeShowed() || actionBar.isSearchFieldVisible())) {
+        if (isPinnedBarHidden() || (threadMessageObject == null || isTopic) && (chatInfo == null && userInfo == null || pinned_msg_id == 0 || !pinnedMessageIds.isEmpty() && pinnedMessageIds.get(0) == preferences.getInt("pin_" + dialog_id, 0)) || isReport() || actionBar != null && (actionBar.isActionModeShowed() || actionBar.isSearchFieldVisible())) {
             changed = hidePinnedMessageView(animated);
         } else {
             if (pinnedMessageView == null) {
@@ -34477,6 +34499,21 @@ public class ChatActivity extends BaseFragment implements
         FilterRuleDialog.show(this, null, template, rule -> BulletinFactory.of(this)
             .createSimpleBulletin(R.raw.info, LocaleController.getString("FilterRuleAdded", R.string.FilterRuleAdded))
             .show());
+    }
+
+    /**
+     * Nnngram: 顶栏置顶消息是否被本聊天隐藏.
+     * 按 dialog 存本地, 和 Telegram 自带的 "pin_<dialog>" (记住已读的那条置顶) 区分开,
+     * 不受管理员重新置顶影响.
+     */
+    private boolean isPinnedBarHidden() {
+        return MessagesController.getNotificationsSettings(currentAccount)
+            .getBoolean("hidePinned_" + dialog_id, false);
+    }
+
+    private void setPinnedBarHidden(boolean hidden) {
+        MessagesController.getNotificationsSettings(currentAccount).edit()
+            .putBoolean("hidePinned_" + dialog_id, hidden).commit();
     }
 
     /**
