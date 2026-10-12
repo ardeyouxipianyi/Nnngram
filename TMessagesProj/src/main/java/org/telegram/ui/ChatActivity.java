@@ -34479,11 +34479,28 @@ public class ChatActivity extends BaseFragment implements
             .show());
     }
 
+    /**
+     * Nnngram: 相册 (media group) 的说明文字只挂在组内某一条上, 而菜单可能是在没配文的那条上打开的
+     * —— 说明文字在布局上由最后一行 (POSITION_FLAG_BOTTOM) 的 cell 绘制, 见 ChatMessageCell.captionFlag(),
+     * 所以按在说明文字上拿到的 selectedObject 往往是没有 caption 的那条. 这里找回真正带文字的那条.
+     */
+    private MessageObject filterSourceMessage(MessageObject messageObject) {
+        // selectedObjectGroup 只保证和 selectedObject 配套, 别的调用方传进来的消息不能拿它去配对
+        if (messageObject != null && messageObject == selectedObject && selectedObjectGroup != null) {
+            MessageObject captionObject = selectedObjectGroup.findCaptionMessageObject();
+            if (captionObject != null) {
+                return captionObject;
+            }
+        }
+        return messageObject;
+    }
+
     /** Nnngram: 「过滤此类消息」对话框 — 按发送者 / 按文本 / 打开规则管理器. */
     private void showFilterMessageDialog(MessageObject messageObject) {
         if (getParentActivity() == null || messageObject == null) {
             return;
         }
+        messageObject = filterSourceMessage(messageObject);
         final long senderId = messageObject.getSenderId();
         final String text = filterTextForRule(messageObject);
 
@@ -48019,8 +48036,9 @@ public class ChatActivity extends BaseFragment implements
                     icons.add(R.drawable.msg_info);
                 }
                 // === Nnngram: 过滤此类消息 (按发送者或说明文字/正文建规则) ===
-                if (selectedObject != null && !selectedObject.isSponsored() && !isEphemeral
-                    && (selectedObject.getSenderId() != 0 || filterTextForRule(selectedObject) != null)) {
+                MessageObject filterMenuSource = filterSourceMessage(selectedObject);
+                if (filterMenuSource != null && !filterMenuSource.isSponsored() && !isEphemeral
+                    && (filterMenuSource.getSenderId() != 0 || filterTextForRule(filterMenuSource) != null)) {
                     items.add(LocaleController.getString("FilterThisMessage", R.string.FilterThisMessage));
                     options.add(OPTION_FILTER_MESSAGE);
                     icons.add(R.drawable.msg_block2);
